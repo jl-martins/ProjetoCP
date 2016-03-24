@@ -39,6 +39,16 @@ g1 = Graph {nodes = fromList [1],
             edges = fromList [Edge 1 1]
            }
 
+gInvalid :: Graph Int
+gInvalid = Graph {nodes = fromList [1,2],
+                  edges = fromList [(1,3)]
+                 }
+
+gDag :: Graph Int
+gDag = Graph {nodes = fromList [1,2,3],
+              edges = fromList [(1,2),(1,3)]
+             }
+
 -- Um exemplo de um teste unitário.
 test_adj :: Test
 test_adj = adj g1 1 ~?= fromList [Edge 1 1]
@@ -51,13 +61,25 @@ test_adj = adj g1 1 ~?= fromList [Edge 1 1]
 --
 
 tests :: Test
-tests = TestList [test_swap]
+tests = TestList [test_swap, test_empty, test_isDag]
 
 test_swap :: Test
 test_swap = swap (Edge 1 2) ~?= (Edge 2 1)
 
+-- verificar se é um teste válido
 test_empty :: Test 
-test_empty = TestCase $ assertBool "" $ isEmpty empty
+test_empty = TestCase $ assertBool "" $ Set.null (nodes empty) && Set.null (edges empty)
+
+test_isValid :: Test
+test_isValid = isValid gInvalid ~?= False
+
+test_isDag :: Test
+test_isDag = TestList [isDag gInvalid ~?= False,
+                       isDag g1 ~?= False,
+                       isDag gDag ~?= True]
+
+test_transpose :: Test 
+test_transpose = transpose gDag ~?= Graph {nodes = fromList [1..3], edges = fromList[(2,1),(3,1)]}
            
 main = runTestTT $ TestList [test_adj]
 

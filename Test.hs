@@ -12,14 +12,14 @@
 -- Os 2 alunos do grupo devem também indentificar-se nos comentários abaixo.
 --
 -- Aluno 1
--- Número:
--- Nome:
--- Curso:
+-- Número: A75273
+-- Nome: João Carlos Mendes Pereira
+-- Curso: MIEI
 --
 -- Aluno 2
--- Número:
--- Nome:
--- Curso:
+-- Número: A68646
+-- Nome: João Luís Alves Barreiros Martins
+-- Curso: MIEI
 --
 
 
@@ -49,6 +49,15 @@ test_adj = adj g1 1 ~?= fromList [Edge 1 1]
 -- Defina testes unitários para todas as funções do módulo Graph,
 -- tentando obter o máximo de cobertura de expressões, condições, etc.
 --
+
+tests :: Test
+tests = TestList [test_swap]
+
+test_swap :: Test
+test_swap = swap (Edge 1 2) ~?= (Edge 2 1)
+
+test_empty :: Test 
+test_empty = TestCase $ assertBool "" $ isEmpty empty
            
 main = runTestTT $ TestList [test_adj]
 

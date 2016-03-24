@@ -1,10 +1,13 @@
-module Tests_JM where
+module Main where
 
 import Graph
 import Test.HUnit hiding (Path, path)
 import Test.QuickCheck
 import Data.Set as Set
 
+-- Testes unitários
+main :: IO Counts
+main = runTestTT tests
 
 -- Grafos usados nos testes unitários
 
@@ -55,9 +58,6 @@ gLarge :: Graph Int
 gLarge = Graph {nodes = nodesGLarge, edges = edgesGLarge}
 
 -- fim dos grafos usados nos testes unitários
-
--- Testes unitários
-main = runTestTT tests
 
 tests :: Test
 tests = TestList [test_isEmpty, test_isForest, test_isSugraphOf, test_union, test_reachable, test_path]

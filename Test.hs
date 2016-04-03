@@ -61,14 +61,10 @@ test_adj = adj g1 1 ~?= fromList [Edge 1 1]
 --
 
 tests :: Test
-tests = TestList [test_swap, test_empty, test_isDag]
+tests = TestList [test_swap, test_isDag, test_adj, test_isPathOf]
 
 test_swap :: Test
 test_swap = swap (Edge 1 2) ~?= (Edge 2 1)
-
--- verificar se é um teste válido
-test_empty :: Test 
-test_empty = TestCase $ assertBool "" $ Set.null (nodes empty) && Set.null (edges empty)
 
 test_isValid :: Test
 test_isValid = isValid gInvalid ~?= False
@@ -80,8 +76,32 @@ test_isDag = TestList [isDag gInvalid ~?= False,
 
 test_transpose :: Test 
 test_transpose = transpose gDag ~?= Graph {nodes = fromList [1..3], edges = fromList[(2,1),(3,1)]}
-           
-main = runTestTT $ TestList [test_adj]
+
+test_adj :: Test
+test_adj = TestList [adj gLarge 4 ~?= Set.fromList [Edge 4 1, Edge 4 2, Edge 4 12, Edge 4 13],
+                     adj g2 2 ~?= Set.fromList []]
+
+
+test_isPathOf :: Test
+test_isPathOf = TestList [isPathOf [] g1 ~?= True,
+                          isPathOf [Edge 1 3] gDag ~?= True,
+                          isPathOf [Edge 2 3] gDag ~?= False,
+                          isPathOf [Edge 1 3, Edge 3 5, Edge 5 6, Edge 6 7, Edge 7 10, Edge 10 9, Edge 9 11, 
+                                    Edge 11 14, Edge 14 13, Edge 13 15] gLarge ~?= True,
+                          --falha 1a condiçao
+                          isPathOf [Edge 1 12, Edge 12 13] ~?= False,
+                          -- falha 2a
+                          isPathOf [Edge 1 3, Edge 5 6] ~?= False,
+                          -- falha na 3a
+                          isPathOf [Edge 1 3, Edge 3 5, Edge 5 9] gLarge ~?= False]
+
+-- falta completar o caso nao trivial
+test_topo :: Test
+test_topo = TestList [topo empty ~?= []]
+
+-- bft, topo
+      
+main = runTestTT tests
 
 --
 -- Teste aleatório

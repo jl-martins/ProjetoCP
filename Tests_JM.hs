@@ -45,7 +45,7 @@ union_g4_g1 = Graph {nodes = fromList [1,2],
                     }
 
 nodesGLarge :: Set Int
-nodesGLarge = fromList [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+nodesGLarge = fromList [1..15]
 
 edgesGLarge :: Set (Edge Int)
 edgesGLarge = fromList [Edge 1 1, Edge 1 3, Edge 2 1, Edge 3 2, Edge 3 5, Edge 4 1, Edge 4 2, 

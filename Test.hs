@@ -63,7 +63,7 @@ union_g4_g1 = Graph {nodes = fromList [1,2],
 
 forest1 :: Graph Int
 forest1 = Graph {nodes = fromList [1,2,3,4,5,6],
-                edges = fromList [Edge 1 3, Edge 3 2, Edge 4 3, Edge 5 6]
+                 edges = fromList [Edge 1 3, Edge 3 2, Edge 4 3, Edge 5 6]
                }
 
 
@@ -90,6 +90,11 @@ gDag = Graph {nodes = fromList [1,2,3],
               edges = fromList [Edge 1 2, Edge 1 3]
              }
 
+graphTopo :: Graph Int
+graphTopo = Graph {nodes = fromList [1,2,3,4,5,6],
+                   edges = fromList [Edge 1 3, Edge 3 2, Edge 3 5, Edge 3 6, Edge 4 3, Edge 5 6]
+                  }
+
 --
 -- Tarefa 1
 --
@@ -100,7 +105,7 @@ gDag = Graph {nodes = fromList [1,2,3],
 tests :: Test
 tests = TestList [test_swap, test_isDAG, test_adj, test_isPathOf, 
                   test_isEmpty, test_isForest, test_isSugraphOf, 
-                  test_union, test_reachable, test_path]
+                  test_union, test_reachable, test_path, test_transpose, test_topo,test_bft]
 
 test_swap :: Test
 test_swap = swap (Edge 1 2) ~?= (Edge 2 1)
@@ -112,9 +117,6 @@ test_isDAG :: Test
 test_isDAG = TestList [isDAG gInvalid ~?= False,
                        isDAG g1 ~?= False,
                        isDAG gDag ~?= True]
-
-test_transpose :: Test 
-test_transpose = transpose gDag ~?= Graph {nodes = fromList [1..3], edges = fromList [Edge 2 1, Edge 3 1]}
 
 test_adj :: Test
 test_adj = TestList [adj gLarge 4 ~?= Set.fromList [Edge 4 1, Edge 4 2, Edge 4 12, Edge 4 13],
@@ -134,11 +136,17 @@ test_isPathOf = TestList [isPathOf [] g1 ~?= True,
                           -- falha na 3a
                           isPathOf [Edge 1 3, Edge 3 5, Edge 5 9] gLarge ~?= False]
 
--- falta completar o caso nao trivial
-test_topo :: Test
-test_topo = TestList [{-topo Graph.empty ~?= []-}]
+test_transpose :: Test
+test_transpose = TestList [transpose forest1 ~?= 
+                 Graph {nodes = fromList [1,2,3,4,5,6],
+                       edges = fromList [Edge 3 1, Edge 2 3, Edge 3 4, Edge 6 5]
+                       }, 
+                  transpose gDag ~?= Graph {nodes = fromList [1..3], edges = fromList [Edge 2 1, Edge 3 1]}]
 
--- JM
+test_topo :: Test
+test_topo = TestList [topo Graph.empty ~?= ([] :: [Set Int]),
+                      topo graphTopo ~?= Prelude.map fromList [[1,4], [3], [2, 5], [6]]
+                      ]
 
 test_isEmpty :: Test
 test_isEmpty = TestList [TestCase $ assertBool "" (isEmpty Graph.empty), 
@@ -176,9 +184,9 @@ test_path = TestList [path gLarge 4 7 ~?= pathGLarge4_7,
     where pathGLarge4_7 :: Maybe (Graph.Path Int) -- caminho mais curto de 4 para 7 em gLarge
           pathGLarge4_7 = Just [Edge 4 1, Edge 1 3, Edge 3 5, Edge 5 6, Edge 6 7]
 
--- bft, topo
-      
-
+test_bft :: Test 
+test_bft = TestList [bft graphTopo (fromList [10]) ~?= Graph {nodes = fromList [10], edges = fromList []}, --propriedade indesejada do código??
+                     bft graphTopo (fromList [1]) ~?= Graph {nodes = fromList [1,3,2,6,5], edges = fromList [Edge 3 1, Edge 2 3, Edge 5 3, Edge 6 3]}] 
 
 main = runTestTT tests
 
@@ -201,6 +209,8 @@ main = runTestTT tests
 --
 
 -- Instância de Arbitrary para arestas
+
+
 instance Arbitrary v => Arbitrary (Edge v) where
     arbitrary = do s <- arbitrary
                    t <- arbitrary
@@ -211,7 +221,14 @@ instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
         where aux = do ns <- arbitrary
                        es <- arbitrary
                        return $ Graph {nodes = fromList ns, edges = fromList es}
- 
+
+
+-- versao inicial
+{-
+instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
+     arbitrary = do ns <- arbitrary -- gera a lista de vertices, primeiro temos de gerar o tamanho
+                    es <-    
+-}
 prop_valid :: Graph Int -> Property
 prop_valid g = collect (length (edges g)) $ isValid g
 

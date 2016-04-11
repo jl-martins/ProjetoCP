@@ -105,7 +105,7 @@ graphTopo = Graph {nodes = fromList [1,2,3,4,5,6],
 tests :: Test
 tests = TestList [test_swap, test_isDAG, test_adj, test_isPathOf, 
                   test_isEmpty, test_isForest, test_isSugraphOf, 
-                  test_union, test_reachable, test_path, test_transpose, test_topo,test_bft]
+                  test_union, test_reachable, test_path, test_transpose, test_topo, test_bft]
 
 test_swap :: Test
 test_swap = swap (Edge 1 2) ~?= (Edge 2 1)
@@ -222,12 +222,21 @@ instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
                        es <- arbitrary
                        return $ Graph {nodes = fromList ns, edges = fromList es}
 
+instance Arbitrary ...
+      gen x = suchThat Set.length$ formList arbitrary == x
+
 
 -- versao inicial
 {-
 instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
-     arbitrary = do ns <- arbitrary -- gera a lista de vertices, primeiro temos de gerar o tamanho
-                    es <-    
+     arbitrary = do nodes <- arbitrary :: [v] >>= return.remReps -- gera a lista de vertices
+                    concat $ map (\x -> aux x nodes) nodes
+                      where
+                         remReps :: [a] -> [a]
+                         remReps = toList . fromList
+                         aux :: v -> vs -> Gen (Set v) -- ver se tem o nodes em scope
+                         aux v nodes = do subL <- sublistOf nodes
+                                          return . fromList $ map (Edge v) subL
 -}
 prop_valid :: Graph Int -> Property
 prop_valid g = collect (length (edges g)) $ isValid g

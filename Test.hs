@@ -210,7 +210,7 @@ main = runTestTT tests
 
 -- Instância de Arbitrary para arestas
 
-
+{-
 instance Arbitrary v => Arbitrary (Edge v) where
     arbitrary = do s <- arbitrary
                    t <- arbitrary
@@ -221,23 +221,20 @@ instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
         where aux = do ns <- arbitrary
                        es <- arbitrary
                        return $ Graph {nodes = fromList ns, edges = fromList es}
-
-instance Arbitrary ...
-      gen x = suchThat Set.length$ formList arbitrary == x
-
-
--- versao inicial
-{-
-instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
-     arbitrary = do nodes <- arbitrary :: [v] >>= return.remReps -- gera a lista de vertices
-                    concat $ map (\x -> aux x nodes) nodes
-                      where
-                         remReps :: [a] -> [a]
-                         remReps = toList . fromList
-                         aux :: v -> vs -> Gen (Set v) -- ver se tem o nodes em scope
-                         aux v nodes = do subL <- sublistOf nodes
-                                          return . fromList $ map (Edge v) subL
 -}
+-- versao inicial
+
+instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
+     arbitrary = do nodos <- listOf (arbitrary) -- gera a lista de vertices
+                    arestas <- (sequence $ Prelude.map (\x -> aux x nodos) nodos) >>= return . concat
+                    return Graph {nodes = fromList nodos, edges = fromList arestas}  
+                      where
+                         remReps ::(Ord a) => [a] -> [a]
+                         remReps = toList . fromList
+                         aux :: (Arbitrary v) => v -> [v] -> Gen [Edge v] -- ver se tem o nodes em scope
+                         aux v nodos = do subL <- sublistOf nodos
+                                          return $ Prelude.map (Edge v) subL
+
 prop_valid :: Graph Int -> Property
 prop_valid g = collect (length (edges g)) $ isValid g
 

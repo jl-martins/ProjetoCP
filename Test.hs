@@ -244,6 +244,9 @@ instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
 
 -- versao inicial: ver como simplificar
 -}
+prop_valid :: Graph Int -> Property
+prop_valid g = collect (length (edges g)) $ isValid g
+
 instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
      arbitrary = do nodos <- listOf (arbitrary)
                     arestas <- (sequence $ Prelude.map (aux nodos) nodos) >>= return . concat
@@ -270,7 +273,11 @@ arbitraryDAG2 = do randomGraph <- arbitrary
 -- para gerar uma floresta a partir de um DAG, basta gerar tornar o dag nao direcionado -> ERRADO!!!
 -}
 
+-- Gerador de DAGs
 -- baseado em http://mathematica.stackexchange.com/a/613
+prop_dag :: Property
+prop_dag = forAll (arbitraryDAG :: Gen (DAG Int)) $ \g -> collect (length (edges g)) $ isDAG g
+
 arbitraryDAG :: (Arbitrary a, Ord a) => Gen (DAG a)
 arbitraryDAG = do randomGraph <- arbitrary
                   ordem <- shuffle $ toList $ nodes randomGraph
@@ -285,6 +292,10 @@ arbitraryDAG = do randomGraph <- arbitrary
                                               | h == y = False
                                               | otherwise = menor t x y                                           
 
+-- Gerador de florestas
+prop_forest :: Property
+prop_forest = forAll (arbitraryForest :: Gen (Forest Int)) $ \g -> collect (length (edges g)) $ isForest g
+
 arbitraryForest :: (Arbitrary a, Ord a) => Gen (Forest a)
 arbitraryForest = do randomDAG <- arbitraryDAG
                      arestas <- sequence $ Prelude.map (\v -> if Set.null (adj randomDAG v) then return Nothing else
@@ -295,24 +306,6 @@ arbitraryForest = do randomDAG <- arbitraryDAG
                      return Graph {nodes = nodes randomDAG, edges = fromList $ fromJustList $ arestas}
                      where
                         fromJustList = Prelude.map (\(Just x) -> x) . Prelude.filter (/= Nothing)
-
-
-prop_valid :: Graph Int -> Property
-prop_valid g = collect (length (edges g)) $ isValid g
-
--- Gerador de DAGs
-dag :: (Ord v, Arbitrary v) => Gen (DAG v)
-dag = arbitrary `suchThat` isDAG
-
-prop_dag :: Property
-prop_dag = forAll (dag :: Gen (DAG Int)) $ \g -> collect (length (edges g)) $ isDAG g
-
--- Gerador de florestas
-forest :: (Ord v, Arbitrary v) => Gen (Forest v)
-forest = arbitrary `suchThat` isForest
-
-prop_forest :: Property
-prop_forest = forAll (forest :: Gen (Forest Int)) $ \g -> collect (length (edges g)) $ isForest g
 
 --
 -- Tarefa 3

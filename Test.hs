@@ -252,12 +252,13 @@ instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
                          aux :: (Arbitrary v) => [v] -> v -> Gen [Edge v]
                          aux nodos v = do subL <- sublistOf nodos
                                           return $ Prelude.map (Edge v) subL
+
 {-
---gerador de DAGS : versao feia inicial
-arbitraryDAG :: (Arbitrary a, Ord a) => Gen (DAG a)
-arbitraryDAG = do randomGraph <- (arbitrary :: (Gen (Graph a)))
-                  randomPermEdges <- shuffle $ toList $ edges randomGraph
-                  return (Graph (nodes randomGraph) $ fromList (aux (toList(nodes randomGraph)) ( toList $ edges randomGraph) [] ))
+--gerador de DAGS : versao feia inicial, mais lento
+arbitraryDAG2 :: (Arbitrary a, Ord a) => Gen (DAG a)
+arbitraryDAG2 = do randomGraph <- arbitrary
+                   randomPermEdges <- shuffle $ toList $ edges randomGraph
+                   return (Graph (nodes randomGraph) $ fromList (aux (toList(nodes randomGraph)) ( toList $ edges randomGraph) [] ))
                        where
                          aux :: (Ord a) => [a] -> [Edge a] -> [Edge a] -> [Edge a]
                          aux nodos [] ac = ac
@@ -282,8 +283,18 @@ arbitraryDAG = do randomGraph <- arbitrary
                               menor (h:t) x y | x == y = False
                                               | h == x = True
                                               | h == y = False
-                                              | otherwise = menor t x y
+                                              | otherwise = menor t x y                                           
 
+arbitraryForest :: (Arbitrary a, Ord a) => Gen (Forest a)
+arbitraryForest = do randomDAG <- arbitraryDAG
+                     arestas <- sequence $ Prelude.map (\v -> if Set.null (adj randomDAG v) then return Nothing else
+                                                              do  x <- elements(toList $ adj randomDAG v)
+                                                                  frequency [(4, return $ Just x), (1, return Nothing)]
+                                                       )
+                                                       (toList $ nodes randomDAG)   
+                     return Graph {nodes = nodes randomDAG, edges = fromList $ fromJustList $ arestas}
+                     where
+                        fromJustList = Prelude.map (\(Just x) -> x) . Prelude.filter (/= Nothing)
 
 
 prop_valid :: Graph Int -> Property

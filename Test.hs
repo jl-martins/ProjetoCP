@@ -224,6 +224,7 @@ instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
 
 OU:
 -}
+{-
 instance Arbitrary v => Arbitrary (Edge v) where
     arbitrary = do s <- arbitrary
                    t <- arbitrary
@@ -242,18 +243,48 @@ instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
 -- Ver enviesamento dos grafos!!
 
 -- versao inicial: ver como simplificar
-{-
+-}
 instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
-     arbitrary = do nodos <- listOf (arbitrary) -- gera a lista de vertices
-                    arestas <- (sequence $ Prelude.map (\x -> aux x nodos) nodos) >>= return . concat
+     arbitrary = do nodos <- listOf (arbitrary)
+                    arestas <- (sequence $ Prelude.map (aux nodos) nodos) >>= return . concat
                     return Graph {nodes = fromList nodos, edges = fromList arestas}  
                       where
-                         remReps ::(Ord a) => [a] -> [a]
-                         remReps = toList . fromList
-                         aux :: (Arbitrary v) => v -> [v] -> Gen [Edge v] -- ver se tem o nodes em scope
-                         aux v nodos = do subL <- sublistOf nodos
+                         aux :: (Arbitrary v) => [v] -> v -> Gen [Edge v]
+                         aux nodos v = do subL <- sublistOf nodos
                                           return $ Prelude.map (Edge v) subL
+{-
+--gerador de DAGS : versao feia inicial
+arbitraryDAG :: (Arbitrary a, Ord a) => Gen (DAG a)
+arbitraryDAG = do randomGraph <- (arbitrary :: (Gen (Graph a)))
+                  randomPermEdges <- shuffle $ toList $ edges randomGraph
+                  return (Graph (nodes randomGraph) $ fromList (aux (toList(nodes randomGraph)) ( toList $ edges randomGraph) [] ))
+                       where
+                         aux :: (Ord a) => [a] -> [Edge a] -> [Edge a] -> [Edge a]
+                         aux nodos [] ac = ac
+                         aux nodos (h:t) ac | all (nocycle (Graph (fromList nodos) (fromList (h:ac)))) nodos = aux nodos t (h:ac) -- ver se devo usar todos os nodos ou só os que foram inseridos
+                                            | otherwise = aux nodos t ac
+                                            --se for mais rapido fazer o FromList  do que o toList,passa-se o Set dos nodos em vez da lista
+                         nocycle g v = all (\a -> v `notMember` reachable g a) $ Set.map target (adj g v)  
+
+-- para gerar uma floresta a partir de um DAG, basta gerar tornar o dag nao direcionado -> ERRADO!!!
 -}
+
+-- baseado em http://mathematica.stackexchange.com/a/613
+arbitraryDAG :: (Arbitrary a, Ord a) => Gen (DAG a)
+arbitraryDAG = do randomGraph <- arbitrary
+                  ordem <- shuffle $ toList $ nodes randomGraph
+                  return Graph {nodes = nodes randomGraph, edges = fromList $ Prelude.filter (ordemAleatoria ordem) $ toList $ edges randomGraph} 
+                             where
+                              ordemAleatoria :: Ord a => [a] -> Edge a -> Bool
+                              ordemAleatoria ordem (Edge x y) = menor ordem x y
+                              menor :: Ord a => [a] -> a -> a -> Bool
+                              -- menor [] -> comportamento indefinido
+                              menor (h:t) x y | x == y = False
+                                              | h == x = True
+                                              | h == y = False
+                                              | otherwise = menor t x y
+
+
 
 prop_valid :: Graph Int -> Property
 prop_valid g = collect (length (edges g)) $ isValid g

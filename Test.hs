@@ -210,12 +210,13 @@ main = runTestTT tests
 
 -- Instância de Arbitrary para arestas
 
-{- Original:
+{- Original:-}
 instance Arbitrary v => Arbitrary (Edge v) where
     arbitrary = do s <- arbitrary
                    t <- arbitrary
                    return $ Edge {source = s, target = t}
 
+{-
 instance (Ord v, Arbitrary v) => Arbitrary (Graph v) where
     arbitrary = aux `suchThat` isValid
         where aux = do ns <- arbitrary
@@ -275,6 +276,7 @@ arbitraryDAG2 = do randomGraph <- arbitrary
 
 -- Gerador de DAGs
 -- baseado em http://mathematica.stackexchange.com/a/613
+
 prop_dag :: Property
 prop_dag = forAll (arbitraryDAG :: Gen (DAG Int)) $ \g -> collect (length (edges g)) $ isDAG g
 
@@ -317,3 +319,41 @@ arbitraryForest = do randomDAG <- arbitraryDAG
 -- Exemplo de uma propriedade QuickCheck para testar a função adj          
 prop_adj :: Graph Int -> Property
 prop_adj g = forAll (elements $ elems $ nodes g) $ \v -> adj g v `isSubsetOf` edges g
+
+prop_swap1 :: Edge Int -> Bool
+prop_swap1 (Edge a b) = swap (Edge a b) == Edge b a
+
+prop_swap2 :: Graph Int -> Bool
+prop_swap2 x = isValid $ Graph {nodes = nodes x, edges = Set.map swap (edges x)}
+
+--prop_swap_DAG :: Property
+--prop_swap_DAG = forAll arbitraryDAG (\Graph {nodes = n, edges = e} -> isDAG(Graph {nodes = n, edges = Set.map swap e}))
+
+prop_isForest_BFT :: Graph Int -> Bool
+prop_isForest_BFT g  = isForest $ bft g (nodes g)
+
+prop_isSubgraphOf_Transpose :: Graph Int -> Bool
+prop_isSubgraphOf_Transpose g = isSubgraphOf (transpose(bft g (nodes g))) g
+
+prop_transpose2 :: Graph Int -> Bool
+prop_transpose2 b = (transpose $ transpose b) == b
+
+prop_union_isSubgraphOf :: Graph Int -> Graph Int -> Property
+prop_union_isSubgraphOf g1 g2 = g1 `isSubgraphOf` (Graph.union g1 g2) .&. g2 `isSubgraphOf` (Graph.union g1 g2)
+
+prop_reachable_adj :: Graph Int -> Property 
+prop_reachable_adj g | Graph.isEmpty g = label "Trivial" True
+                     | otherwise = property $  isSubsetOf (Set.map target (adj g x)) (reachable g x)
+                             where
+                               x = head $ toList $ nodes g
+
+{-
+prop_adj_topo :: Graph Int -> Property
+prop_adj_topo g | isEmpty g = label "Trivial" True
+                | otherwise = head $ topo (Graph {, adj}) 
+-}
+
+{- errado
+prop_transpose_topo :: Property
+prop_transpose_topo = forAll (arbitraryDAG :: Gen (Graph Int)) (\g -> (topo . transpose) g == (reverse . topo) g)
+-}

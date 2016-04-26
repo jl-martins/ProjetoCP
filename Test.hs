@@ -350,10 +350,25 @@ prop_reachable_adj g | Graph.isEmpty g = label "Trivial" True
 {-
 prop_adj_topo :: Graph Int -> Property
 prop_adj_topo g | isEmpty g = label "Trivial" True
-                | otherwise = head $ topo (Graph {, adj}) 
+                | otherwise = head $ topo (Graph {nodes g, adj }) 
 -}
 
 {- errado
 prop_transpose_topo :: Property
 prop_transpose_topo = forAll (arbitraryDAG :: Gen (Graph Int)) (\g -> (topo . transpose) g == (reverse . topo) g)
 -}
+
+
+-- se existe um caminho entre i e j entao i < j na ordenacao topologica -> DAGS
+-- o caminho dado por path isPathOf do grafo original
+-- para um dado ponto i, se j é rechable entao path != Nothing
+
+prop_topo :: Property
+prop_topo = forAll (arbitraryDAG :: Gen(DAG Int)) 
+                   (\g -> all (menorTopo$ topo g) (toList $ edges g))
+                   where
+                     menorTopo :: [Set Int] -> Edge Int ->  Bool
+                     menorTopo [] _ = undefined
+                     menorTopo (h:t) ed@(Edge a b) | member a h && notMember b h = True
+                                                   | member a h && member b h = False
+                                                   | otherwise = menorTopo t ed

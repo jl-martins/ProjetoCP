@@ -376,9 +376,6 @@ prop_reachable_adj g | Graph.isEmpty g = label "Trivial" True
                              where
                                x = head $ toList $ nodes g
 
-prop_reachable_bft :: Graph Int -> Bool
-prop_reachable_bft g = all (\x -> reachable g x == )
-
 {-
 prop_adj_topo :: Graph Int -> Property
 prop_adj_topo g | isEmpty g = label "Trivial" True

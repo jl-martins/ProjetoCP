@@ -29,6 +29,7 @@ import Graph
 import Test.HUnit hiding (path)
 import Test.QuickCheck
 import Data.Set as Set
+import Data.Maybe(fromJust)
 
 --
 -- Teste unitário
@@ -324,28 +325,59 @@ prop_swap1 :: Edge Int -> Bool
 prop_swap1 (Edge a b) = swap (Edge a b) == Edge b a
 
 prop_swap2 :: Graph Int -> Bool
-prop_swap2 x = isValid $ Graph {nodes = nodes x, edges = Set.map swap (edges x)}
+prop_swap2 g = isValid $ Graph {nodes = nodes g, edges = Set.map swap (edges g)}
 
---prop_swap_DAG :: Property
---prop_swap_DAG = forAll arbitraryDAG (\Graph {nodes = n, edges = e} -> isDAG(Graph {nodes = n, edges = Set.map swap e}))
+-- O resultado da funcao 'bft' e um grafo valido
+prop_isValid_bft :: Graph Int -> Bool
+prop_isValid_bft g = isValid (bft g (nodes g))
 
+-- O resultado da funcao 'bft' e uma floresta
 prop_isForest_BFT :: Graph Int -> Bool
 prop_isForest_BFT g  = isForest $ bft g (nodes g)
 
+-- A transposta da floresta produzida por 'bft' de um grafo g e um subgrafo de g
 prop_isSubgraphOf_Transpose :: Graph Int -> Bool
 prop_isSubgraphOf_Transpose g = isSubgraphOf (transpose(bft g (nodes g))) g
 
+-- A transposta de um grafo e um grafo valido.
+prop_isValid_transpose :: Property
+prop_isValid_transpose = forAll (arbitrary :: Gen (Graph Int)) (isValid . transpose)
+
+-- A transposta da transposta de qualquer grafo e o proprio grafo
 prop_transpose2 :: Graph Int -> Bool
-prop_transpose2 b = (transpose $ transpose b) == b
+prop_transpose2 g = (transpose $ transpose g) == g
+
+-- A transposta de um DAG e um DAG.
+prop_transpose_DAG_isDAG :: Property
+prop_transpose_DAG_isDAG = forAll (arbitraryDAG :: Gen (DAG Int)) (isDAG . transpose)
 
 prop_union_isSubgraphOf :: Graph Int -> Graph Int -> Property
 prop_union_isSubgraphOf g1 g2 = g1 `isSubgraphOf` (Graph.union g1 g2) .&. g2 `isSubgraphOf` (Graph.union g1 g2)
 
+-- A união de um grafo com ele próprio é o próprio grafo
+prop_union_self :: Graph Int -> Bool
+prop_union_self g = (Graph.union g g) == g
+
+-- Propriedade comutativa da uniao de grafos
+prop_commut_union :: Graph Int -> Graph Int -> Bool
+prop_commut_union g1 g2 = (Graph.union g1 g2) == (Graph.union g2 g1)
+
+-- A uniao das transpostas de 2 grafos e igual a transposta da uniao dos mesmos
+prop_transpose_union :: Graph Int -> Graph Int -> Bool
+prop_transpose_union g1 g2 = (transpose g1) `Graph.union` (transpose g2) == transpose (g1 `Graph.union` g2)
+
+-- Propriedade associativa da uniao de grafos
+prop_assoc_union :: Graph Int -> Graph Int -> Graph Int -> Bool
+prop_assoc_union g1 g2 g3 = (Graph.union (Graph.union g1 g2) g3) == (Graph.union g1 (Graph.union g2 g3))
+
 prop_reachable_adj :: Graph Int -> Property 
 prop_reachable_adj g | Graph.isEmpty g = label "Trivial" True
-                     | otherwise = property $  isSubsetOf (Set.map target (adj g x)) (reachable g x)
+                     | otherwise       = property $  isSubsetOf (Set.map target (adj g x)) (reachable g x)
                              where
                                x = head $ toList $ nodes g
+
+prop_reachable_bft :: Graph Int -> Bool
+prop_reachable_bft g = all (\x -> reachable g x == )
 
 {-
 prop_adj_topo :: Graph Int -> Property
@@ -372,3 +404,47 @@ prop_topo = forAll (arbitraryDAG :: Gen(DAG Int))
                      menorTopo (h:t) ed@(Edge a b) | member a h && notMember b h = True
                                                    | member a h && member b h = False
                                                    | otherwise = menorTopo t ed
+
+-- Para uma ordenacao toplogica nao vazia, o grau de entrada 
+-- de todos vertices da sua cabeça e necessariamente 0.
+prop_null_inD_headTopo :: DAG Int -> Property
+prop_null_inD_headTopo g = let t = topo g
+                               inD :: Int -> DAG Int -> Int
+                               inD v g = Set.size (Set.filter ((==v) . target) (edges g))
+                           in ((not $ Prelude.null t) && (not $ Set.null (head t)))
+                              ==> 
+                              forAll (elements $ elems $ head t) (\v -> (inD v g) == 0)
+
+-- Para qualquer vertice v, o conjunto dos vertices adjacentes ao 
+-- mesmo e um subconjunto dos nodos alcançaveis a partir de v.
+prop_adj_reachable :: Graph Int -> Property
+prop_adj_reachable g = forAll (elements $ elems $ nodes g) 
+                              (\v -> (Set.map target (adj g v)) `isSubsetOf` (reachable g v))
+
+-- Gerador usado nos testes das propriedades que envolvem a funcao 'path'
+geradorPropPath :: Gen (Graph Int, Int, Int)
+geradorPropPath = do g <- arbitrary
+                     x <- if Graph.isEmpty g then return 0 else elements $ elems $ nodes g -- o 'if' evita exceções quando g é vazio
+                     y <- if Graph.isEmpty g then return 0 else elements $ elems $ nodes g
+                     return (g, x, y)
+
+-- Se um vertice v2 for alcancavel a partir de um vertice v1, entao o caminho
+-- mais curto entre eles e um caminho (isPathOf) do grafo a que eles pertencem.
+prop_path_isPathOf :: Graph Int -> Property
+prop_path_isPathOf g = forAll geradorPropPath pathIsPathOf
+      where 
+            pathIsPathOf (g,v1,v2) = (path g v1 v2) /= Nothing ==> (fromJust $ path g v1 v2) `isPathOf` g
+
+prop_path_subPath :: Property
+prop_path_subPath = forAll geradorPropPath prop_path_aux
+    where prop_path_aux :: (Graph Int, Int, Int) -> Property
+          prop_path_aux (g,x,y) | path g x y == Nothing   = label "Não há caminho" True
+                                | x == y                  = label "Origem = Destino" True
+                                | otherwise               = property $ fromJust (path g w y) == tail (fromJust (path g x y))
+                        where w = (target . head) (fromJust (path g x y))
+
+-- O conjunto de arestas do caminho entre 2 vértices sao um subconjunto das arestas do grafo
+prop_path_isSubsetOf :: Property
+prop_path_isSubsetOf = forAll geradorPropPath f
+    where f = \(g, x, y) -> path g x y /= Nothing  ==> (fromList (fromJust (path g x y))) `isSubsetOf` (edges g)
+

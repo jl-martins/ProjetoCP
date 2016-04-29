@@ -112,7 +112,8 @@ test_swap :: Test
 test_swap = swap (Edge 1 2) ~?= (Edge 2 1)
 
 test_isValid :: Test
-test_isValid = isValid gInvalid ~?= False
+test_isValid = TestList [isValid g1 ~?= True,
+                         isValid gInvalid ~?= False]
 
 test_isDAG :: Test
 test_isDAG = TestList [isDAG gInvalid ~?= False,
@@ -128,8 +129,8 @@ test_isPathOf :: Test
 test_isPathOf = TestList [isPathOf [] g1 ~?= True,
                           isPathOf [Edge 1 3] gDag ~?= True,
                           isPathOf [Edge 2 3] gDag ~?= False,
-                          isPathOf [Edge 1 3, Edge 3 5, Edge 5 6, Edge 6 7, Edge 7 10, Edge 10 9, Edge 9 11, 
-                                    Edge 11 14, Edge 14 13, Edge 13 15] gLarge ~?= True,
+                          isPathOf [Edge 1 3, Edge 3 5, Edge 5 6, Edge 6 7, Edge 7 10, Edge 10 9, 
+                                    Edge 9 11, Edge 11 14, Edge 14 13, Edge 13 15] gLarge ~?= True,
                           --falha 1a condiçao
                           isPathOf [Edge 1 12, Edge 12 13] gLarge ~?= False,
                           -- falha 2a
@@ -189,6 +190,7 @@ test_bft :: Test
 test_bft = TestList [bft graphTopo (fromList [10]) ~?= Graph {nodes = fromList [10], edges = fromList []}, --propriedade indesejada do código??
                      bft graphTopo (fromList [1]) ~?= Graph {nodes = fromList [1,3,2,6,5], edges = fromList [Edge 3 1, Edge 2 3, Edge 5 3, Edge 6 3]}] 
 
+main :: IO Counts
 main = runTestTT tests
 
 --
@@ -245,7 +247,7 @@ arbitraryDAG = do randomGraph <- arbitrary
                               ordemAleatoria :: Ord a => [a] -> Edge a -> Bool
                               ordemAleatoria ordem (Edge x y) = menor ordem x y
                               menor :: Ord a => [a] -> a -> a -> Bool
-                              -- menor [] -> comportamento indefinido
+                              menor [] _ _ = undefined
                               menor (h:t) x y | x == y = False
                                               | h == x = True
                                               | h == y = False
@@ -280,6 +282,7 @@ prop_adj g = forAll (elements $ elems $ nodes g) $ \v -> adj g v `isSubsetOf` ed
 prop_swap1 :: Edge Int -> Bool
 prop_swap1 (Edge a b) = swap (Edge a b) == Edge b a
 
+-- Aplicar swap após swap é equivalente a não fazer nada.
 prop_swap2 :: Edge Int -> Bool
 prop_swap2 e = swap (swap e) == e
 
@@ -292,8 +295,8 @@ prop_isForest_bft :: Graph Int -> Bool
 prop_isForest_bft g  = isForest $ bft g (nodes g)
 
 -- A transposta da floresta produzida por 'bft g (nodes g)' é um subgrafo de g.
-prop_isSubgraphOf_Transpose :: Graph Int -> Bool
-prop_isSubgraphOf_Transpose g = isSubgraphOf (transpose(bft g (nodes g))) g
+prop_transpBFT_isSubgraphOf :: Graph Int -> Bool
+prop_transpBFT_isSubgraphOf g = transpose (bft g (nodes g)) `isSubgraphOf` g
 
 -- A transposta de um grafo é um grafo válido.
 prop_isValid_transpose :: Property
@@ -307,14 +310,15 @@ prop_transpose2 g = (transpose $ transpose g) == g
 prop_transpose_DAG_isDAG :: Property
 prop_transpose_DAG_isDAG = forAll (arbitraryDAG :: Gen (DAG Int)) (isDAG . transpose)
 
+-- Qualquer grafo g1 é um subgrafo da sua união com um qualquer grafo g2 (e vice-versa).
 prop_union_isSubgraphOf :: Graph Int -> Graph Int -> Property
 prop_union_isSubgraphOf g1 g2 = g1 `isSubgraphOf` (Graph.union g1 g2) .&. g2 `isSubgraphOf` (Graph.union g1 g2)
 
--- A união de um grafo com ele próprio é o próprio grafo
+-- A união de um grafo com ele próprio é o próprio grafo.
 prop_union_self :: Graph Int -> Bool
 prop_union_self g = (Graph.union g g) == g
 
--- Propriedade comutativa da união de grafos
+-- Propriedade comutativa da união de grafos.
 prop_commut_union :: Graph Int -> Graph Int -> Bool
 prop_commut_union g1 g2 = (Graph.union g1 g2) == (Graph.union g2 g1)
 
@@ -322,26 +326,12 @@ prop_commut_union g1 g2 = (Graph.union g1 g2) == (Graph.union g2 g1)
 prop_transpose_union :: Graph Int -> Graph Int -> Bool
 prop_transpose_union g1 g2 = (transpose g1) `Graph.union` (transpose g2) == transpose (g1 `Graph.union` g2)
 
--- Propriedade associativa da união de grafos
+-- Propriedade associativa da união de grafos.
 prop_assoc_union :: Graph Int -> Graph Int -> Graph Int -> Bool
 prop_assoc_union g1 g2 g3 = (Graph.union (Graph.union g1 g2) g3) == (Graph.union g1 (Graph.union g2 g3))
 
-prop_reachable_adj :: Graph Int -> Property 
-prop_reachable_adj g | Graph.isEmpty g = label "Trivial" True
-                     | otherwise       = property $  isSubsetOf (Set.map target (adj g x)) (reachable g x)
-                             where
-                               x = head $ toList $ nodes g
-
-{-
-prop_adj_topo :: Graph Int -> Property
-prop_adj_topo g | isEmpty g = label "Trivial" True
-                | otherwise = head $ topo (Graph {nodes g, adj }) 
--}
-
--- se existe um caminho entre i e j entao i < j na ordenacao topologica -> DAGS
--- o caminho dado por path isPathOf do grafo original
--- para um dado ponto i, se j é rechable entao path /= Nothing
-
+-- Dado um DAG 'g' e duas arestas 'a' e 'b' desse DAG, se existe uma aresta
+-- de 'a' para 'b' então 'a' aparece antes de 'b' na ordenacão topológica de 'g'.
 prop_topo :: Property
 prop_topo = forAll (arbitraryDAG :: Gen(DAG Int)) 
                    (\g -> all (menorTopo$ topo g) (toList $ edges g))
@@ -363,13 +353,13 @@ prop_null_inD_headTopo g = let t = topo g
                               forAll (elements $ elems $ head t) (\v -> (inD v g) == 0)
 
 -- Para qualquer vértice v, o conjunto dos vértices adjacentes ao 
--- mesmo é um subconjunto dos nodos alcançáveis a partir de v.
+-- mesmo é um subconjunto dos vértices alcançáveis a partir de v.
 prop_adj_reachable :: Graph Int -> Property
 prop_adj_reachable g = (not $ Graph.isEmpty g) 
-                      ==> forAll (elements $ elems $ nodes g)
+                       ==> forAll (elements $ elems $ nodes g)
                            $ \v -> (Set.map target (adj g v)) `isSubsetOf` (reachable g v)
 
--- Se um vértice 'dst' for alcancavel a partir de um vértice src, então o caminho
+-- Se um vértice 'dst' for alcançável a partir de um vértice src, então o caminho
 -- mais curto entre eles é um caminho (isPathOf) do grafo a que eles pertencem.
 prop_path_isPathOf :: Graph Int -> Property
 prop_path_isPathOf g = (not $ Graph.isEmpty g) ==>
@@ -377,17 +367,21 @@ prop_path_isPathOf g = (not $ Graph.isEmpty g) ==>
                           forAll (elements $ elems $ nodes g) $ \dst ->
                           path g src dst /= Nothing ==> fromJust (path g src dst) `isPathOf` g
 
+-- Seja 'y' um nodo alcançável a partir de um nodo 'x', tal que x /= y
+-- e seja 'p' o caminho mais curto entre 'x' e 'y', temos que 'p' contém
+-- o caminho mais curto entre o sucessor imediato de 'x' (em 'p') e o nodo 'y'.
 prop_path_subPath :: Graph Int -> Property
-prop_path_subPath g = forAll (elements $ elems $ nodes g) $ \src ->
-                      forAll (elements $ elems $ nodes g) $ \dst ->
-                      prop_path_aux (g,src,dst)
-    where prop_path_aux :: (Graph Int, Int, Int) -> Property
-          prop_path_aux (g,x,y) | path g x y == Nothing   = label "Não há caminho" True
-                                | x == y                  = label "Origem = Destino" True
-                                | otherwise               = property $ fromJust (path g w y) == tail (fromJust (path g x y))
+prop_path_subPath g = (not $ Graph.isEmpty g) ==>
+                          forAll (elements $ elems $ nodes g) $ \src ->
+                          forAll (elements $ elems $ nodes g) $ \dst ->
+                          prop_path_aux g src dst
+    where
+          prop_path_aux g x y | path g x y == Nothing   = label "Não há caminho" True
+                              | x == y                  = label "Origem = Destino" True
+                              | otherwise               = property $ fromJust (path g w y) == tail (fromJust (path g x y))
                         where w = (target . head) (fromJust (path g x y))
 
--- O conjunto de arestas do caminho entre 2 vértices é um subconjunto das arestas do grafo
+-- O conjunto de arestas no caminho entre 2 vértices é um subconjunto das arestas do grafo.
 prop_path_isSubsetOf :: Graph Int -> Property
 prop_path_isSubsetOf g = (not $ Graph.isEmpty g) ==>
                             forAll (elements $ elems $ nodes g) $ \src ->
@@ -397,8 +391,8 @@ prop_path_isSubsetOf g = (not $ Graph.isEmpty g) ==>
           edgesPathSubsetOfedges g src dst =
               path g src dst /= Nothing ==> fromList (fromJust (path g src dst)) `isSubsetOf` (edges g)
 
--- Para cada um dos vértices 'dst' alcançáveis a partir de um dado vértice 'src'
--- a função 'path g src dst' não pode devolver Nothing
+-- Para cada destino 'dst' alcançável a partir de uma qualquer origem
+-- 'src', a função 'path g src dst' não pode devolver Nothing.
 prop_path_reachable :: Graph Int -> Property
 prop_path_reachable g | Graph.isEmpty g   = label "Trivial" True
                       | otherwise         = forAll (elements $ elems $ nodes g) (existsPathToReachable g)
